@@ -86,6 +86,14 @@ window.
 Use a common ground between boards. Level shifting is recommended on any 5 V Uno
 output that enters the ESP32-CAM.
 
+The capture bot watches for a rising edge on `GPIO13`. On each valid trigger it
+captures a JPEG, saves it to MicroSD first, then optionally sends that saved
+photo through Telegram if Wi-Fi notifications are enabled.
+
+If the SD card is near full, the capture bot rotates storage by deleting the
+oldest `/intrusion_*.jpg` files until there is room for the new image. It only
+rotates files created by this firmware naming pattern.
+
 ## Configuration
 
 - Main phone number and sensor thresholds: `Main Controller/include/Config.h`
@@ -93,6 +101,49 @@ output that enters the ESP32-CAM.
 - ESP32-CAM capture settings: `Capture Bot/include/Config.h`
 - Optional Wi-Fi settings: copy `Capture Bot/include/WifiSettings.example.h` to
   `Capture Bot/include/WifiSettings.h` and enable `WIFI_NOTIFICATIONS_ENABLED`.
+
+## Telegram Setup
+
+Telegram is optional. The ESP32-CAM will still save photos to MicroSD when Wi-Fi
+is unavailable, credentials are missing, or Telegram fails.
+
+1. In Telegram, message `@BotFather`, create a bot, and copy the bot token.
+2. Send one message to your new bot from the Telegram account or group that
+   should receive alerts.
+3. Get the chat ID. A common quick check is opening this URL in a browser after
+   replacing the token:
+
+   ```text
+   https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates
+   ```
+
+4. Copy `Capture Bot/include/WifiSettings.example.h` to
+   `Capture Bot/include/WifiSettings.h`.
+5. Set:
+
+   ```cpp
+   #define WIFI_NOTIFICATIONS_ENABLED 1
+   #define WIFI_SSID "your-wifi"
+   #define WIFI_PASSWORD "your-password"
+   #define TELEGRAM_BOT_TOKEN "123456:replace-me"
+   #define TELEGRAM_CHAT_ID "123456789"
+   #define TELEGRAM_PHOTO_CAPTION "Security alert: photo captured"
+   #define TELEGRAM_CERT_VALIDATION_ENABLED 1
+   #define TELEGRAM_ROOT_CA "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----\n"
+   #define NTP_GMT_OFFSET_SECONDS 28800L
+   #define NTP_DAYLIGHT_OFFSET_SECONDS 0
+   ```
+
+With certificate validation enabled, the ESP32-CAM syncs time through NTP before
+opening the Telegram HTTPS connection. If time sync fails or `TELEGRAM_ROOT_CA`
+is empty, Telegram sending is skipped/retried instead of using insecure TLS.
+
+Failed Telegram sends are queued in RAM and retried every configured interval
+while the board remains powered. The photo remains on MicroSD either way. The
+retry queue is not persisted across reboot.
+
+For development only, `TELEGRAM_CERT_VALIDATION_ENABLED` can be set to `0`; that
+uses insecure TLS and should not be used for a deployed system.
 
 ## Electrical Notes
 

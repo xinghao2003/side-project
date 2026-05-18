@@ -2,6 +2,8 @@
 
 #include <SD_MMC.h>
 #include <esp_camera.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "Config.h"
 
@@ -45,16 +47,103 @@ bool CameraService::captureToSd(char *pathBuffer, size_t pathBufferSize) {
     return false;
   }
 
-  snprintf(pathBuffer, pathBufferSize, "/intrusion_%lu.jpg",
-           static_cast<unsigned long>(millis()));
-  File image = SD_MMC.open(pathBuffer, FILE_WRITE);
-  if (!image) {
+  if (!ensureStorageFor(frame->len)) {
     esp_camera_fb_return(frame);
     return false;
+  }
+
+  snprintf(pathBuffer, pathBufferSize, "/intrusion_%lu.jpg",
+           static_cast<unsigned long>(millis()));
+  File image;
+  for (uint8_t attempt = 0; attempt <= CaptureSettings::MaxStorageRotationDeletes;
+       ++attempt) {
+    image = SD_MMC.open(pathBuffer, FILE_WRITE);
+    if (image) {
+      break;
+    }
+
+    if (!rotateOldestCapture()) {
+      esp_camera_fb_return(frame);
+      return false;
+    }
   }
 
   const size_t written = image.write(frame->buf, frame->len);
   image.close();
   esp_camera_fb_return(frame);
-  return written == frame->len;
+  if (written == frame->len) {
+    return true;
+  }
+
+  SD_MMC.remove(pathBuffer);
+  return false;
+}
+
+bool CameraService::ensureStorageFor(size_t captureBytes) {
+  for (uint8_t attempt = 0; attempt <= CaptureSettings::MaxStorageRotationDeletes;
+       ++attempt) {
+    const uint64_t totalBytes = SD_MMC.totalBytes();
+    const uint64_t usedBytes = SD_MMC.usedBytes();
+    if (totalBytes == 0 || usedBytes > totalBytes) {
+      return false;
+    }
+
+    const uint64_t freeBytes = totalBytes - usedBytes;
+    if (freeBytes >=
+        captureBytes + CaptureSettings::MinFreeBytesAfterCapture) {
+      return true;
+    }
+
+    if (!rotateOldestCapture()) {
+      return false;
+    }
+  }
+
+  return false;
+}
+
+bool CameraService::rotateOldestCapture() {
+  File root = SD_MMC.open("/");
+  if (!root || !root.isDirectory()) {
+    return false;
+  }
+
+  char oldestPath[48] = {};
+  unsigned long oldestTimestamp = 0xFFFFFFFFUL;
+  File entry = root.openNextFile();
+  while (entry) {
+    const char *name = entry.name();
+    if (!entry.isDirectory() && isCaptureFile(name)) {
+      const char *timestampStart = strstr(name, "intrusion_") + strlen("intrusion_");
+      const unsigned long timestamp =
+          strtoul(timestampStart, nullptr, 10);
+      if (timestamp < oldestTimestamp) {
+        oldestTimestamp = timestamp;
+        strlcpy(oldestPath, name, sizeof(oldestPath));
+      }
+    }
+    entry.close();
+    entry = root.openNextFile();
+  }
+  root.close();
+
+  if (oldestPath[0] == '\0') {
+    return false;
+  }
+
+  Serial.print(F("capture-bot: rotating old image "));
+  Serial.println(oldestPath);
+  return SD_MMC.remove(oldestPath);
+}
+
+bool CameraService::isCaptureFile(const char *name) const {
+  constexpr char prefix[] = "intrusion_";
+  constexpr char suffix[] = ".jpg";
+  const char *baseName = name[0] == '/' ? name + 1 : name;
+  const size_t nameLen = strlen(name);
+  const size_t prefixLen = strlen(prefix);
+  const size_t suffixLen = strlen(suffix);
+  return nameLen > prefixLen + suffixLen &&
+         strncmp(baseName, prefix, prefixLen) == 0 &&
+         strcmp(name + nameLen - suffixLen, suffix) == 0;
 }

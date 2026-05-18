@@ -24,6 +24,8 @@ void setup() {
 }
 
 void loop() {
+  notifier.updateRetries();
+
   const bool triggerState = digitalRead(Pins::TriggerIn) == HIGH;
   const unsigned long now = millis();
 
@@ -39,7 +41,10 @@ void loop() {
     if (captured) {
       Serial.print(F("capture-bot: saved "));
       Serial.println(path);
-      notifier.notifyCapture(path);
+      const bool notified = notifier.notifyCapture(path);
+      if (notified) {
+        Serial.println(F("capture-bot: notification complete"));
+      }
     } else {
       Serial.println(F("capture-bot: capture failed"));
     }
