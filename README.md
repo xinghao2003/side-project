@@ -41,6 +41,87 @@ pio run -d ".\Auth Controller"
 pio run -d ".\Capture Bot"
 ```
 
+If `pio` is not on `PATH`, use the PlatformIO virtual environment directly:
+
+```powershell
+& $env:USERPROFILE\.platformio\penv\Scripts\pio run -d ".\Main Controller"
+& $env:USERPROFILE\.platformio\penv\Scripts\pio run -d ".\Auth Controller"
+& $env:USERPROFILE\.platformio\penv\Scripts\pio run -d ".\Capture Bot"
+```
+
+## Build, Flash, Monitor
+
+### Main Controller
+
+Build:
+
+```powershell
+pio run -d ".\Main Controller"
+```
+
+Flash:
+
+```powershell
+pio run -d ".\Main Controller" -t upload
+```
+
+Monitor USB diagnostics:
+
+```powershell
+pio device monitor -d ".\Main Controller" -b 9600
+```
+
+Main Controller uses USB Serial at `9600` baud for diagnostics. SIM800L is on
+`SoftwareSerial` pins `D9/D10`, so it should not interfere with upload or serial
+monitor.
+
+### Auth Controller
+
+Build:
+
+```powershell
+pio run -d ".\Auth Controller"
+```
+
+Flash:
+
+```powershell
+pio run -d ".\Auth Controller" -t upload
+```
+
+Monitor RFID UID logs:
+
+```powershell
+pio device monitor -d ".\Auth Controller" -b 9600
+```
+
+Use this monitor to scan RFID cards and copy the printed UID into
+`Auth Controller/include/Config.h`.
+
+### Capture Bot
+
+Build:
+
+```powershell
+pio run -d ".\Capture Bot"
+```
+
+Flash:
+
+```powershell
+pio run -d ".\Capture Bot" -t upload
+```
+
+Monitor capture and Telegram logs:
+
+```powershell
+pio device monitor -d ".\Capture Bot" -b 115200
+```
+
+For many ESP32-CAM programmer boards, flashing requires `GPIO0` connected to
+`GND` during reset/upload. Remove that connection and reset again to run normal
+firmware.
+
 ## Current Prototype Pin Plan
 
 ### Main Controller Arduino Uno
