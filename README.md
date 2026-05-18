@@ -70,10 +70,20 @@ idles HIGH and pulls the line LOW for a short authorized pulse.
 | MFRC522 MOSI/MISO/SCK | D11/D12/D13 |
 | Main controller `AUTH_OK` output | A1 |
 | Main controller `AUTH_WINDOW` input | A2 |
+| Buzzer | A3 |
+| External status LED | A4 |
 
 Share ground between both Unos. `AUTH_WINDOW` is optional for decision logic; it
 is currently used to blink the auth board status LED during the disarm/alarm
 window.
+
+The auth signal is a simple active-low pulse. The auth board idles HIGH and
+pulls `AUTH_OK` LOW briefly after a valid RFID card or keypad code.
+
+The auth board locks out after the configured number of failed RFID/keypad
+attempts. During lockout it ignores new credentials, holds the status LED on,
+and uses the buzzer for lockout feedback. Wrong keypad submit or unknown RFID
+card also produce a buzzer warning.
 
 ### ESP32-CAM
 
@@ -97,10 +107,37 @@ rotates files created by this firmware naming pattern.
 ## Configuration
 
 - Main phone number and sensor thresholds: `Main Controller/include/Config.h`
-- Auth keypad code and card UIDs: `Auth Controller/include/Config.h`
+- Auth keypad code, card UIDs, lockout timing, buzzer timing, and auth pulse:
+  `Auth Controller/include/Config.h`
 - ESP32-CAM capture settings: `Capture Bot/include/Config.h`
 - Optional Wi-Fi settings: copy `Capture Bot/include/WifiSettings.example.h` to
   `Capture Bot/include/WifiSettings.h` and enable `WIFI_NOTIFICATIONS_ENABLED`.
+
+## RFID Setup
+
+The auth controller logs scanned card UIDs to Serial at `9600` baud when
+`Developer::LogScannedRfidUid` is enabled in
+`Auth Controller/include/Config.h`.
+
+1. Upload `Auth Controller`.
+2. Open the serial monitor at `9600` baud.
+3. Scan each RFID card.
+4. Copy the logged UID into `Secrets::AuthorizedCards`.
+
+Example serial output:
+
+```text
+RFID UID: 04 A1 B2 C3 D4 55 80 [unknown]
+```
+
+Example config:
+
+```cpp
+constexpr const char *AuthorizedCards[] = {
+    "04 A1 B2 C3 D4 55 80",
+    "13 7F 29 0A",
+};
+```
 
 ## Telegram Setup
 
@@ -144,6 +181,14 @@ retry queue is not persisted across reboot.
 
 For development only, `TELEGRAM_CERT_VALIDATION_ENABLED` can be set to `0`; that
 uses insecure TLS and should not be used for a deployed system.
+
+## TODO
+
+- Add replay-resistant auth between Main Controller and Auth Controller using
+  UART or I2C challenge-response. The current `AUTH_OK` wire is prototype-simple
+  and assumes the inter-board wiring is inside a protected enclosure.
+- Persist auth lockout state in EEPROM so power-cycling the auth controller does
+  not immediately clear failed attempts or an active lockout.
 
 ## Electrical Notes
 

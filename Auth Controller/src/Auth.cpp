@@ -28,8 +28,13 @@ void AccessControl::begin() {
   resetKeypadBuffer();
 }
 
-bool AccessControl::checkAuthorized() {
-  return checkRfid() || checkKeypad();
+AuthResult AccessControl::check() {
+  const AuthResult rfidResult = checkRfid();
+  if (rfidResult != AuthResult::None) {
+    return rfidResult;
+  }
+
+  return checkKeypad();
 }
 
 void AccessControl::resetKeypadBuffer() {
@@ -37,33 +42,35 @@ void AccessControl::resetKeypadBuffer() {
   keypadLen_ = 0;
 }
 
-bool AccessControl::checkRfid() {
+AuthResult AccessControl::checkRfid() {
   if (!rfid_.PICC_IsNewCardPresent() || !rfid_.PICC_ReadCardSerial()) {
-    return false;
+    return AuthResult::None;
   }
 
   char uid[32] = {};
   formatUid(uid, sizeof(uid));
+  const bool authorized = isAuthorizedUid(uid);
+  logRfidUid(uid, authorized);
   rfid_.PICC_HaltA();
   rfid_.PCD_StopCrypto1();
-  return isAuthorizedUid(uid);
+  return authorized ? AuthResult::Authorized : AuthResult::Denied;
 }
 
-bool AccessControl::checkKeypad() {
+AuthResult AccessControl::checkKeypad() {
   const char key = keypad.getKey();
   if (!key) {
-    return false;
+    return AuthResult::None;
   }
 
   if (key == '*') {
     resetKeypadBuffer();
-    return false;
+    return AuthResult::None;
   }
 
   if (key == '#') {
     const bool authorized = strcmp(keypadBuffer_, Secrets::KeypadCode) == 0;
     resetKeypadBuffer();
-    return authorized;
+    return authorized ? AuthResult::Authorized : AuthResult::Denied;
   }
 
   if (keypadLen_ < sizeof(keypadBuffer_) - 1) {
@@ -71,7 +78,7 @@ bool AccessControl::checkKeypad() {
     keypadBuffer_[keypadLen_] = '\0';
   }
 
-  return false;
+  return AuthResult::None;
 }
 
 bool AccessControl::isAuthorizedUid(const char *uid) const {
@@ -93,4 +100,16 @@ void AccessControl::formatUid(char *buffer, size_t size) const {
     snprintf(buffer + offset, size - offset, "%02X", rfid_.uid.uidByte[i]);
     offset += 2;
   }
+}
+
+void AccessControl::logRfidUid(const char *uid, bool authorized) const {
+  if (!Developer::LogScannedRfidUid) {
+    return;
+  }
+
+  Serial.print(F("RFID UID: "));
+  Serial.print(uid);
+  Serial.print(F(" ["));
+  Serial.print(authorized ? F("authorized") : F("unknown"));
+  Serial.println(F("]"));
 }

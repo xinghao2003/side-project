@@ -5,25 +5,71 @@
 
 AccessControl accessControl;
 
-bool pulsingAuth = false;
 bool statusLedOn = false;
-unsigned long pulseStartedMs = 0;
+uint8_t failedAttempts = 0;
+unsigned long lockoutUntilMs = 0;
 unsigned long lastBlinkMs = 0;
 
-void startAuthPulse() {
-  digitalWrite(Pins::AuthOk, LOW);
-  pulsingAuth = true;
-  pulseStartedMs = millis();
+bool lockedOut() {
+  return lockoutUntilMs != 0 && millis() < lockoutUntilMs;
 }
 
-void updateAuthPulse() {
-  if (pulsingAuth && millis() - pulseStartedMs >= Timing::AuthPulseMs) {
-    digitalWrite(Pins::AuthOk, HIGH);
-    pulsingAuth = false;
+void beep(uint16_t frequency, unsigned long durationMs) {
+  tone(Pins::Buzzer, frequency, durationMs);
+  delay(durationMs + 25);
+  noTone(Pins::Buzzer);
+}
+
+void notifyAuthorized() {
+  beep(2200, Timing::BuzzerShortMs);
+  beep(2600, Timing::BuzzerShortMs);
+}
+
+void notifyDenied() {
+  beep(700, Timing::BuzzerLongMs);
+}
+
+void notifyLocked() {
+  beep(500, Timing::BuzzerShortMs);
+  beep(500, Timing::BuzzerShortMs);
+  beep(500, Timing::BuzzerShortMs);
+}
+
+void sendLowPulse(unsigned long lowMs) {
+  digitalWrite(Pins::AuthOk, LOW);
+  delay(lowMs);
+  digitalWrite(Pins::AuthOk, HIGH);
+}
+
+void recordDeniedAttempt() {
+  if (lockedOut()) {
+    notifyLocked();
+    return;
+  }
+
+  ++failedAttempts;
+  notifyDenied();
+
+  if (failedAttempts >= Security::MaxFailedAttempts) {
+    lockoutUntilMs = millis() + Timing::LockoutMs;
+    accessControl.resetKeypadBuffer();
+    notifyLocked();
   }
 }
 
+void recordAuthorizedAttempt() {
+  failedAttempts = 0;
+  lockoutUntilMs = 0;
+  notifyAuthorized();
+  sendLowPulse(Timing::AuthPulseMs);
+}
+
 void updateStatusLed() {
+  if (lockedOut()) {
+    digitalWrite(Pins::StatusLed, HIGH);
+    return;
+  }
+
   const bool authWindowOpen = digitalRead(Pins::AuthWindow) == HIGH;
   if (!authWindowOpen) {
     statusLedOn = false;
@@ -42,20 +88,30 @@ void updateStatusLed() {
 }
 
 void setup() {
+  Serial.begin(9600);
   pinMode(Pins::AuthOk, OUTPUT);
   digitalWrite(Pins::AuthOk, HIGH);
   pinMode(Pins::AuthWindow, INPUT);
   pinMode(Pins::StatusLed, OUTPUT);
+  pinMode(Pins::Buzzer, OUTPUT);
   digitalWrite(Pins::StatusLed, LOW);
+  digitalWrite(Pins::Buzzer, LOW);
 
   accessControl.begin();
 }
 
 void loop() {
-  updateAuthPulse();
   updateStatusLed();
 
-  if (!pulsingAuth && accessControl.checkAuthorized()) {
-    startAuthPulse();
+  if (lockedOut()) {
+    accessControl.resetKeypadBuffer();
+    return;
+  }
+
+  const AuthResult result = accessControl.check();
+  if (result == AuthResult::Authorized) {
+    recordAuthorizedAttempt();
+  } else if (result == AuthResult::Denied) {
+    recordDeniedAttempt();
   }
 }

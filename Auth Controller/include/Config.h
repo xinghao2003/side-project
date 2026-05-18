@@ -11,13 +11,25 @@ constexpr uint8_t RfidSlaveSelect = 10;
 
 constexpr uint8_t AuthOk = A1;
 constexpr uint8_t AuthWindow = A2;
-constexpr uint8_t StatusLed = LED_BUILTIN;
+constexpr uint8_t Buzzer = A3;
+constexpr uint8_t StatusLed = A4;
 } // namespace Pins
 
 namespace Timing {
-constexpr unsigned long AuthPulseMs = 300;
 constexpr unsigned long StatusBlinkMs = 250;
+constexpr unsigned long LockoutMs = 30000;
+constexpr unsigned long BuzzerShortMs = 80;
+constexpr unsigned long BuzzerLongMs = 220;
+constexpr unsigned long AuthPulseMs = 300;
 } // namespace Timing
+
+namespace Security {
+constexpr uint8_t MaxFailedAttempts = 3;
+} // namespace Security
+
+namespace Developer {
+constexpr bool LogScannedRfidUid = true;
+} // namespace Developer
 
 namespace Secrets {
 constexpr char KeypadCode[] = "1234";
