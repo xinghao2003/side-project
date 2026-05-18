@@ -1,0 +1,16 @@
+{
+  "folders": [
+    {
+      "path": "Main Controller"
+    },
+    {
+      "path": "Auth Controller"
+    },
+    {
+      "path": "Capture Bot"
+    }
+  ],
+  "settings": {
+    "platformio-ide.activateProjectOnTextEditorChange": true
+  }
+}
