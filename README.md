@@ -16,7 +16,7 @@ PIR + HC-SR04 + MQ-4
                   |
        +----------+----------+----------------+
        |                     |                |
-   SIM800L SMS          ESP32-CAM trigger  AUTH_WINDOW
+   SIM800L SMS/call     ESP32-CAM trigger  AUTH_WINDOW
    Buzzer alarm              |                |
                              v                v
                     JPEG saved to MicroSD  Auth Controller
@@ -28,7 +28,8 @@ The Uno treats gas as an immediate emergency. Intrusion requires both PIR motion
 and a human-sized ultrasonic distance for repeated samples. After a confirmed
 intrusion signal, the user has 10 seconds to disarm. The auth controller checks
 RFID/keypad input and sends an active-low `AUTH_OK` pulse before the buzzer, GSM
-alert, and camera trigger run.
+alert/call, and camera trigger run. When disarmed, another valid auth pulse
+starts the normal arming delay again.
 
 ## Projects
 
@@ -53,11 +54,25 @@ pio run -d ".\Capture Bot"
 | ESP32-CAM trigger | D6 |
 | Auth controller `AUTH_OK` input | D7 |
 | Auth controller `AUTH_WINDOW` output | D8 |
+| SIM800L RX from Uno TX | D9 |
+| SIM800L TX to Uno RX | D10 |
 | MQ-4 analog out | A0 |
-| SIM800L TX/RX | Uno D0/D1 hardware serial |
+| USB serial diagnostics | USB / D0-D1 |
 
 `AUTH_OK` is active-low. Main controller uses `INPUT_PULLUP`; the auth board
 idles HIGH and pulls the line LOW for a short authorized pulse.
+
+SIM800L is handled through `SoftwareSerial` so USB Serial remains available for
+development diagnostics. Wire from the Arduino perspective:
+
+```text
+Main D10 RX <- SIM800L TX
+Main D9  TX -> SIM800L RX
+GND shared
+```
+
+Use a divider or level shifter from Main `D9` into SIM800L RX because the Uno is
+5 V and SIM800L logic is lower voltage.
 
 ### Auth Controller Arduino Uno
 
@@ -79,6 +94,17 @@ window.
 
 The auth signal is a simple active-low pulse. The auth board idles HIGH and
 pulls `AUTH_OK` LOW briefly after a valid RFID card or keypad code.
+
+Main Controller interprets this pulse by state:
+
+```text
+Armed / DisarmWindow / Alarm -> Disarmed
+Disarmed -> Arming
+Arming -> Disarmed
+```
+
+A cooldown prevents rapid repeated arm/disarm changes from one held or repeated
+auth pulse.
 
 The auth board locks out after the configured number of failed RFID/keypad
 attempts. During lockout it ignores new credentials, holds the status LED on,
@@ -139,6 +165,25 @@ constexpr const char *AuthorizedCards[] = {
 };
 ```
 
+## Main Controller Diagnostics
+
+Main Controller uses USB Serial at `9600` baud for development diagnostics.
+SIM800L is on `SoftwareSerial`, so diagnostic output is not mixed into the modem
+AT command channel.
+
+Typical diagnostics:
+
+```text
+diag state=ARMED pir=1 distance_cm=82 gas_raw=341 human_likely=1 gas_danger=0
+gsm: sending sms
+gsm: placing call
+```
+
+GSM handling now waits for modem responses such as `OK`, `ERROR`, `+CMGS:`, and
+network registration before treating modem actions as successful. Emergency
+alerts send SMS first, then place a call for the configured call duration before
+hanging up.
+
 ## Telegram Setup
 
 Telegram is optional. The ESP32-CAM will still save photos to MicroSD when Wi-Fi
@@ -194,6 +239,9 @@ uses insecure TLS and should not be used for a deployed system.
 
 - SIM800L needs a separate stable supply capable of current bursts. Do not power
   it from the Uno 5 V pin.
+- Disconnecting SIM800L during upload should no longer be necessary because it
+  is not wired to Uno `D0/D1`; USB serial remains dedicated to upload and
+  diagnostics.
 - ESP32-CAM also needs a stable external 5 V supply.
 - MQ-4 needs calibration and warm-up before the raw threshold is meaningful.
 - HC-SR04 echo is 5 V. If connected to ESP32 in future revisions, level shift it.

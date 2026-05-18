@@ -24,7 +24,34 @@ unsigned long stateStartedMs = 0;
 unsigned long lastSensorReadMs = 0;
 unsigned long lastAlarmMs = 0;
 unsigned long lastAuthPulseMs = 0;
+unsigned long lastAuthActionMs = 0;
+unsigned long lastDiagnosticsMs = 0;
 AlarmReason pendingReason = AlarmReason::Intrusion;
+SensorSnapshot latestSnapshot;
+
+void enterState(SystemState next);
+
+void serviceEmergencyOutputs() {
+  alarmOutput.update();
+  cameraTrigger.update();
+}
+
+const __FlashStringHelper *stateName(SystemState current) {
+  switch (current) {
+  case SystemState::Arming:
+    return F("ARMING");
+  case SystemState::Armed:
+    return F("ARMED");
+  case SystemState::DisarmWindow:
+    return F("DISARM_WINDOW");
+  case SystemState::Alarm:
+    return F("ALARM");
+  case SystemState::Disarmed:
+    return F("DISARMED");
+  }
+
+  return F("UNKNOWN");
+}
 
 bool authAccepted() {
   const unsigned long now = millis();
@@ -38,6 +65,21 @@ bool authAccepted() {
 
   lastAuthPulseMs = now;
   return true;
+}
+
+void handleAuthAction() {
+  const unsigned long now = millis();
+  if (!authAccepted() ||
+      now - lastAuthActionMs < Timing::AuthActionCooldownMs) {
+    return;
+  }
+
+  lastAuthActionMs = now;
+  if (state == SystemState::Disarmed) {
+    enterState(SystemState::Arming);
+  } else {
+    enterState(SystemState::Disarmed);
+  }
 }
 
 void enterState(SystemState next) {
@@ -61,19 +103,25 @@ void triggerEmergency(AlarmReason reason) {
 
   pendingReason = reason;
   lastAlarmMs = now;
+  enterState(SystemState::Alarm);
   alarmOutput.start(reason);
   cameraTrigger.requestCapture();
-  gsmNotifier.sendAlert(reason);
-  enterState(SystemState::Alarm);
+  const bool alertSent = gsmNotifier.sendAlert(reason);
+  if (Developer::DiagnosticsEnabled) {
+    Serial.println(alertSent ? F("main: gsm alert complete")
+                             : F("main: gsm alert incomplete"));
+  }
 }
 
 void setup() {
+  Serial.begin(9600);
   pinMode(Pins::AuthOk, INPUT_PULLUP);
   pinMode(Pins::AuthWindow, OUTPUT);
   digitalWrite(Pins::AuthWindow, LOW);
   sensors.begin();
   alarmOutput.begin();
   cameraTrigger.begin();
+  gsmNotifier.setServiceCallback(serviceEmergencyOutputs);
   gsmNotifier.begin();
   enterState(SystemState::Arming);
 }
@@ -81,13 +129,15 @@ void setup() {
 void loop() {
   alarmOutput.update();
   cameraTrigger.update();
-
-  if (authAccepted()) {
-    enterState(SystemState::Disarmed);
-  }
+  handleAuthAction();
 
   const unsigned long now = millis();
   if (state == SystemState::Disarmed) {
+    if (Developer::DiagnosticsEnabled &&
+        now - lastDiagnosticsMs >= Timing::DiagnosticsMs) {
+      lastDiagnosticsMs = now;
+      Serial.println(F("diag state=DISARMED"));
+    }
     return;
   }
 
@@ -101,13 +151,30 @@ void loop() {
   }
   lastSensorReadMs = now;
 
-  const SensorSnapshot snapshot = sensors.read();
-  if (snapshot.gasDanger) {
+  latestSnapshot = sensors.read();
+  if (Developer::DiagnosticsEnabled &&
+      now - lastDiagnosticsMs >= Timing::DiagnosticsMs) {
+    lastDiagnosticsMs = now;
+    Serial.print(F("diag state="));
+    Serial.print(stateName(state));
+    Serial.print(F(" pir="));
+    Serial.print(latestSnapshot.pirMotion ? 1 : 0);
+    Serial.print(F(" distance_cm="));
+    Serial.print(latestSnapshot.distanceCm);
+    Serial.print(F(" gas_raw="));
+    Serial.print(latestSnapshot.gasRaw);
+    Serial.print(F(" human_likely="));
+    Serial.print(latestSnapshot.humanLikely ? 1 : 0);
+    Serial.print(F(" gas_danger="));
+    Serial.println(latestSnapshot.gasDanger ? 1 : 0);
+  }
+
+  if (latestSnapshot.gasDanger) {
     triggerEmergency(AlarmReason::GasLeak);
     return;
   }
 
-  if (state == SystemState::Armed && snapshot.humanLikely) {
+  if (state == SystemState::Armed && latestSnapshot.humanLikely) {
     enterState(SystemState::DisarmWindow);
     return;
   }
