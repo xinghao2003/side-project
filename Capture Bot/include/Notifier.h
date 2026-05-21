@@ -21,6 +21,7 @@ private:
   bool sendTelegramPhoto(const char *path, const char *chatId);
   void pollTelegramCommands();
   void handleTelegramCommand(const String &command, const String &chatId);
+  void updateDisarmPulse();
   bool triggerDisarmPulse();
   bool isAuthorizedCommandUser(const String &updateJson) const;
   String extractJsonString(const String &source, int start, const char *key) const;
@@ -31,6 +32,8 @@ private:
   CameraService *cameraService_ = nullptr;
   bool wifiReady_ = false;
   bool timeSynced_ = false;
+  bool disarmPulseActive_ = false;
+  unsigned long disarmPulseStartedMs_ = 0;
   unsigned long lastTelegramCommandPollMs_ = 0;
   unsigned long telegramUpdateOffset_ = 0;
   char retryPaths_[NetworkSettings::TelegramRetryQueueSize][48] = {};

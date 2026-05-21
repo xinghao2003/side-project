@@ -73,6 +73,7 @@ bool Notifier::notifyCaptureToChat(const char *path, const char *chatId) {
 
 void Notifier::updateRetries() {
 #if WIFI_NOTIFICATIONS_ENABLED
+  updateDisarmPulse();
   pollTelegramCommands();
 
   const unsigned long now = millis();
@@ -365,10 +366,26 @@ void Notifier::handleTelegramCommand(const String &command, const String &chatId
 }
 
 bool Notifier::triggerDisarmPulse() {
-  digitalWrite(Pins::DisarmOut, LOW);
-  delay(CaptureSettings::DisarmPulseMs);
-  digitalWrite(Pins::DisarmOut, HIGH);
+  if (!disarmPulseActive_) {
+    digitalWrite(Pins::DisarmOut, LOW);
+    disarmPulseActive_ = true;
+    disarmPulseStartedMs_ = millis();
+  }
   return true;
+}
+
+void Notifier::updateDisarmPulse() {
+  if (!disarmPulseActive_) {
+    return;
+  }
+
+  const unsigned long now = millis();
+  if (now - disarmPulseStartedMs_ < CaptureSettings::DisarmPulseMs) {
+    return;
+  }
+
+  digitalWrite(Pins::DisarmOut, HIGH);
+  disarmPulseActive_ = false;
 }
 
 bool Notifier::isAuthorizedCommandUser(const String &updateJson) const {
