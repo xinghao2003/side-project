@@ -308,9 +308,13 @@ void Notifier::pollTelegramCommands() {
 
     const String updateIdText = extractJsonString(updateJson, 0, "\"update_id\":");
     if (updateIdText.length() > 0) {
-      const uint32_t updateId = static_cast<uint32_t>(strtoul(updateIdText.c_str(), nullptr, 10));
-      if (updateId >= telegramUpdateOffset_) {
-        telegramUpdateOffset_ = updateId + 1;
+      char *endPtr = nullptr;
+      const unsigned long parsed = strtoul(updateIdText.c_str(), &endPtr, 10);
+      if (endPtr != updateIdText.c_str() && *endPtr == '\0') {
+        const uint32_t updateId = static_cast<uint32_t>(parsed);
+        if (updateId >= telegramUpdateOffset_) {
+          telegramUpdateOffset_ = updateId + 1;
+        }
       }
     }
 
