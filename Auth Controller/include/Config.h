@@ -13,6 +13,7 @@ constexpr uint8_t AuthOk = A1;
 constexpr uint8_t AuthWindow = A2;
 constexpr uint8_t Buzzer = A3;
 constexpr uint8_t StatusLed = A4;
+constexpr uint8_t AuthFailAlarm = A5;
 } // namespace Pins
 
 namespace Timing {
@@ -21,6 +22,7 @@ constexpr unsigned long LockoutMs = 30000;
 constexpr unsigned long BuzzerShortMs = 80;
 constexpr unsigned long BuzzerLongMs = 220;
 constexpr unsigned long AuthPulseMs = 300;
+constexpr unsigned long AuthFailPulseMs = 300;
 } // namespace Timing
 
 namespace Security {

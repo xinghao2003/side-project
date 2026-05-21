@@ -5,9 +5,7 @@
 struct SensorSnapshot {
   bool pirMotion = false;
   uint16_t distanceCm = 0;
-  uint16_t gasRaw = 0;
   bool humanLikely = false;
-  bool gasDanger = false;
 };
 
 class SecuritySensors {

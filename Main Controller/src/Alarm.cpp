@@ -25,7 +25,7 @@ void AlarmOutput::update() {
   }
 
   const unsigned long now = millis();
-  const unsigned long intervalMs = reason_ == AlarmReason::GasLeak ? 120 : 250;
+  const unsigned long intervalMs = reason_ == AlarmReason::BreakIn ? 150 : 250;
   if (now - lastToggleMs_ < intervalMs) {
     return;
   }

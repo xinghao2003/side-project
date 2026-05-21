@@ -9,7 +9,7 @@ Three-board PlatformIO prototype for a low-cost security and safety system.
 ## Architecture
 
 ```text
-PIR + HC-SR04 + MQ-4
+PIR + HC-SR04
                   |
                   v
         Arduino Uno security state machine
@@ -24,12 +24,14 @@ PIR + HC-SR04 + MQ-4
                                       AUTH_OK pulse
 ```
 
-The Uno treats gas as an immediate emergency. Intrusion requires both PIR motion
-and a human-sized ultrasonic distance for repeated samples. After a confirmed
-intrusion signal, the user has 10 seconds to disarm. The auth controller checks
-RFID/keypad input and sends an active-low `AUTH_OK` pulse before the buzzer, GSM
-alert/call, and camera trigger run. When disarmed, another valid auth pulse
-starts the normal arming delay again.
+Intrusion requires both PIR motion and a human-sized ultrasonic distance for
+repeated samples. After a confirmed intrusion signal, the user has 10 seconds to
+disarm. The auth controller checks RFID/keypad input and sends an active-low
+`AUTH_OK` pulse before the buzzer, GSM alert/call, and camera trigger run.
+Repeated failed auth attempts send an active-low `AUTH_FAIL_ALARM` pulse to
+trigger immediate break-in alarm handling. The main controller can be disarmed
+by valid auth pulse or by a Telegram-triggered disarm pulse from ESP32-CAM.
+When disarmed, another valid auth pulse starts the normal arming delay again.
 
 ## Projects
 
@@ -137,7 +139,8 @@ firmware.
 | Auth controller `AUTH_WINDOW` output | D8 |
 | SIM800L RX from Uno TX | D9 |
 | SIM800L TX to Uno RX | D10 |
-| MQ-4 analog out | A0 |
+| Auth controller `AUTH_FAIL_ALARM` input | A0 |
+| ESP32-CAM Telegram disarm input | A1 |
 | USB serial diagnostics | USB / D0-D1 |
 
 `AUTH_OK` is active-low. Main controller uses `INPUT_PULLUP`; the auth board
@@ -168,6 +171,7 @@ Use a divider or level shifter from Main `D9` into SIM800L RX because the Uno is
 | Main controller `AUTH_WINDOW` input | A2 |
 | Buzzer | A3 |
 | External status LED | A4 |
+| Main controller `AUTH_FAIL_ALARM` output | A5 |
 
 Share ground between both Unos. `AUTH_WINDOW` is optional for decision logic; it
 is currently used to blink the auth board status LED during the disarm/alarm
@@ -175,6 +179,9 @@ window.
 
 The auth signal is a simple active-low pulse. The auth board idles HIGH and
 pulls `AUTH_OK` LOW briefly after a valid RFID card or keypad code.
+
+When failed attempts reach lockout, the auth board also emits a short active-low
+`AUTH_FAIL_ALARM` pulse to the main board.
 
 Main Controller interprets this pulse by state:
 
@@ -189,14 +196,16 @@ auth pulse.
 
 The auth board locks out after the configured number of failed RFID/keypad
 attempts. During lockout it ignores new credentials, holds the status LED on,
-and uses the buzzer for lockout feedback. Wrong keypad submit or unknown RFID
-card also produce a buzzer warning.
+uses the buzzer for lockout feedback, and sends an `AUTH_FAIL_ALARM` pulse to
+the main board. Wrong keypad submit or unknown RFID card also produce a buzzer
+warning.
 
 ### ESP32-CAM
 
 | Signal | Pin |
 | --- | --- |
 | Trigger from Uno D6 | GPIO13 |
+| Disarm pulse output to Main A1 | GPIO12 |
 | Flash LED | GPIO4 |
 | MicroSD | SD_MMC one-bit mode |
 
@@ -255,7 +264,7 @@ AT command channel.
 Typical diagnostics:
 
 ```text
-diag state=ARMED pir=1 distance_cm=82 gas_raw=341 human_likely=1 gas_danger=0
+diag state=ARMED pir=1 distance_cm=82 human_likely=1
 gsm: sending sms
 gsm: placing call
 ```
@@ -290,6 +299,7 @@ is unavailable, credentials are missing, or Telegram fails.
    #define WIFI_PASSWORD "your-password"
    #define TELEGRAM_BOT_TOKEN "123456:replace-me"
    #define TELEGRAM_CHAT_ID "123456789"
+   #define TELEGRAM_ALLOWED_USER_ID "123456789"
    #define TELEGRAM_PHOTO_CAPTION "Security alert: photo captured"
    #define TELEGRAM_CERT_VALIDATION_ENABLED 1
    #define TELEGRAM_ROOT_CA "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----\n"
@@ -304,6 +314,13 @@ is empty, Telegram sending is skipped/retried instead of using insecure TLS.
 Failed Telegram sends are queued in RAM and retried every configured interval
 while the board remains powered. The photo remains on MicroSD either way. The
 retry queue is not persisted across reboot.
+
+When `TELEGRAM_ALLOWED_USER_ID` is configured, the bot also polls for commands
+from that user:
+
+- `/disarm` sends a short disarm pulse from ESP32-CAM to the main controller.
+- `/capture` captures a fresh photo and replies in Telegram (no persistent
+  storage required for command captures).
 
 For development only, `TELEGRAM_CERT_VALIDATION_ENABLED` can be set to `0`; that
 uses insecure TLS and should not be used for a deployed system.
@@ -324,7 +341,6 @@ uses insecure TLS and should not be used for a deployed system.
   is not wired to Uno `D0/D1`; USB serial remains dedicated to upload and
   diagnostics.
 - ESP32-CAM also needs a stable external 5 V supply.
-- MQ-4 needs calibration and warm-up before the raw threshold is meaningful.
 - HC-SR04 echo is 5 V. If connected to ESP32 in future revisions, level shift it.
 - The MFRC522 is a 3.3 V device; use proper level handling when driven by a 5 V
   Uno.

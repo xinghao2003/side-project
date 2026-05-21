@@ -24,6 +24,7 @@ unsigned long stateStartedMs = 0;
 unsigned long lastSensorReadMs = 0;
 unsigned long lastAlarmMs = 0;
 unsigned long lastAuthPulseMs = 0;
+unsigned long lastAuthFailPulseMs = 0;
 unsigned long lastAuthActionMs = 0;
 unsigned long lastDiagnosticsMs = 0;
 AlarmReason pendingReason = AlarmReason::Intrusion;
@@ -53,9 +54,21 @@ const __FlashStringHelper *stateName(SystemState current) {
   return F("UNKNOWN");
 }
 
+const __FlashStringHelper *alarmReasonName(AlarmReason reason) {
+  switch (reason) {
+  case AlarmReason::Intrusion:
+    return F("INTRUSION");
+  case AlarmReason::BreakIn:
+    return F("BREAK_IN");
+  }
+
+  return F("UNKNOWN");
+}
+
 bool authAccepted() {
   const unsigned long now = millis();
-  if (digitalRead(Pins::AuthOk) != LOW) {
+  if (digitalRead(Pins::AuthOk) != LOW &&
+      digitalRead(Pins::TelegramDisarm) != LOW) {
     return false;
   }
 
@@ -64,6 +77,20 @@ bool authAccepted() {
   }
 
   lastAuthPulseMs = now;
+  return true;
+}
+
+bool authFailDetected() {
+  const unsigned long now = millis();
+  if (digitalRead(Pins::AuthFailAlarm) != LOW) {
+    return false;
+  }
+
+  if (now - lastAuthFailPulseMs < Timing::AuthFailPulseDebounceMs) {
+    return false;
+  }
+
+  lastAuthFailPulseMs = now;
   return true;
 }
 
@@ -116,6 +143,8 @@ void triggerEmergency(AlarmReason reason) {
 void setup() {
   Serial.begin(9600);
   pinMode(Pins::AuthOk, INPUT_PULLUP);
+  pinMode(Pins::AuthFailAlarm, INPUT_PULLUP);
+  pinMode(Pins::TelegramDisarm, INPUT_PULLUP);
   pinMode(Pins::AuthWindow, OUTPUT);
   digitalWrite(Pins::AuthWindow, LOW);
   sensors.begin();
@@ -130,6 +159,9 @@ void loop() {
   alarmOutput.update();
   cameraTrigger.update();
   handleAuthAction();
+  if (authFailDetected()) {
+    triggerEmergency(AlarmReason::BreakIn);
+  }
 
   const unsigned long now = millis();
   if (state == SystemState::Disarmed) {
@@ -161,17 +193,13 @@ void loop() {
     Serial.print(latestSnapshot.pirMotion ? 1 : 0);
     Serial.print(F(" distance_cm="));
     Serial.print(latestSnapshot.distanceCm);
-    Serial.print(F(" gas_raw="));
-    Serial.print(latestSnapshot.gasRaw);
     Serial.print(F(" human_likely="));
     Serial.print(latestSnapshot.humanLikely ? 1 : 0);
-    Serial.print(F(" gas_danger="));
-    Serial.println(latestSnapshot.gasDanger ? 1 : 0);
-  }
-
-  if (latestSnapshot.gasDanger) {
-    triggerEmergency(AlarmReason::GasLeak);
-    return;
+    if (state == SystemState::Alarm) {
+      Serial.print(F(" reason="));
+      Serial.print(alarmReasonName(pendingReason));
+    }
+    Serial.println();
   }
 
   if (state == SystemState::Armed && latestSnapshot.humanLikely) {

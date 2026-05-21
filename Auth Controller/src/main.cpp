@@ -35,10 +35,10 @@ void notifyLocked() {
   beep(500, Timing::BuzzerShortMs);
 }
 
-void sendLowPulse(unsigned long lowMs) {
-  digitalWrite(Pins::AuthOk, LOW);
+void sendLowPulse(uint8_t pin, unsigned long lowMs) {
+  digitalWrite(pin, LOW);
   delay(lowMs);
-  digitalWrite(Pins::AuthOk, HIGH);
+  digitalWrite(pin, HIGH);
 }
 
 void recordDeniedAttempt() {
@@ -53,6 +53,7 @@ void recordDeniedAttempt() {
   if (failedAttempts >= Security::MaxFailedAttempts) {
     lockoutUntilMs = millis() + Timing::LockoutMs;
     accessControl.resetKeypadBuffer();
+    sendLowPulse(Pins::AuthFailAlarm, Timing::AuthFailPulseMs);
     notifyLocked();
   }
 }
@@ -61,7 +62,7 @@ void recordAuthorizedAttempt() {
   failedAttempts = 0;
   lockoutUntilMs = 0;
   notifyAuthorized();
-  sendLowPulse(Timing::AuthPulseMs);
+  sendLowPulse(Pins::AuthOk, Timing::AuthPulseMs);
 }
 
 void updateStatusLed() {
@@ -91,6 +92,8 @@ void setup() {
   Serial.begin(9600);
   pinMode(Pins::AuthOk, OUTPUT);
   digitalWrite(Pins::AuthOk, HIGH);
+  pinMode(Pins::AuthFailAlarm, OUTPUT);
+  digitalWrite(Pins::AuthFailAlarm, HIGH);
   pinMode(Pins::AuthWindow, INPUT);
   pinMode(Pins::StatusLed, OUTPUT);
   pinMode(Pins::Buzzer, OUTPUT);

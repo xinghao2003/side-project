@@ -69,8 +69,8 @@ bool GsmNotifier::sendSms(AlarmReason reason) {
     return false;
   }
 
-  sim800_.print(reason == AlarmReason::GasLeak
-                    ? F("ALERT: methane gas leak detected")
+  sim800_.print(reason == AlarmReason::BreakIn
+                    ? F("ALERT: repeated auth failures indicate break-in")
                     : F("ALERT: confirmed intrusion detected"));
   sim800_.write(26);
 
