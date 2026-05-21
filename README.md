@@ -297,10 +297,10 @@ is unavailable, credentials are missing, or Telegram fails.
    #define WIFI_NOTIFICATIONS_ENABLED 1
    #define WIFI_SSID "your-wifi"
    #define WIFI_PASSWORD "your-password"
-    #define TELEGRAM_BOT_TOKEN "123456:replace-me"
-    #define TELEGRAM_CHAT_ID "123456789"
-    #define TELEGRAM_ALLOWED_USER_ID "123456789"
-    #define TELEGRAM_PHOTO_CAPTION "Security alert: photo captured"
+   #define TELEGRAM_BOT_TOKEN "123456:replace-me"
+   #define TELEGRAM_CHAT_ID "123456789"
+   #define TELEGRAM_ALLOWED_USER_ID "123456789"
+   #define TELEGRAM_PHOTO_CAPTION "Security alert: photo captured"
    #define TELEGRAM_CERT_VALIDATION_ENABLED 1
    #define TELEGRAM_ROOT_CA "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----\n"
    #define NTP_GMT_OFFSET_SECONDS 28800L

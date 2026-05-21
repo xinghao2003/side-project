@@ -32,7 +32,7 @@ private:
   bool wifiReady_ = false;
   bool timeSynced_ = false;
   unsigned long lastTelegramCommandPollMs_ = 0;
-  uint32_t telegramUpdateOffset_ = 0;
+  unsigned long telegramUpdateOffset_ = 0;
   char retryPaths_[NetworkSettings::TelegramRetryQueueSize][48] = {};
   uint8_t retryAttempts_[NetworkSettings::TelegramRetryQueueSize] = {};
   unsigned long retryAfterMs_[NetworkSettings::TelegramRetryQueueSize] = {};

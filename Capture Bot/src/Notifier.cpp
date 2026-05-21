@@ -311,11 +311,8 @@ void Notifier::pollTelegramCommands() {
       char *endPtr = nullptr;
       const unsigned long parsed = strtoul(updateIdText.c_str(), &endPtr, 10);
       if (endPtr != updateIdText.c_str() && *endPtr == '\0') {
-        if (parsed <= 0xFFFFFFFFUL) {
-          const uint32_t updateId = static_cast<uint32_t>(parsed);
-          if (updateId >= telegramUpdateOffset_) {
-            telegramUpdateOffset_ = updateId + 1;
-          }
+        if (parsed >= telegramUpdateOffset_) {
+          telegramUpdateOffset_ = parsed + 1;
         }
       }
     }
@@ -346,13 +343,12 @@ void Notifier::handleTelegramCommand(const String &command, const String &chatId
     return;
   }
 
-  CameraService *cameraService = cameraService_;
-  if (cameraService == nullptr) {
+  if (cameraService_ == nullptr) {
     return;
   }
 
   char path[48] = {};
-  const bool captured = cameraService->captureToSd(path, sizeof(path));
+  const bool captured = cameraService_->captureToSd(path, sizeof(path));
   if (!captured) {
     Serial.println(F("capture-bot: command capture failed"));
     return;
