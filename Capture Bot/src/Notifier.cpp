@@ -3,6 +3,7 @@
 #include <SD_MMC.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
