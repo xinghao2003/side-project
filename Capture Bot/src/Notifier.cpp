@@ -311,9 +311,11 @@ void Notifier::pollTelegramCommands() {
       char *endPtr = nullptr;
       const unsigned long parsed = strtoul(updateIdText.c_str(), &endPtr, 10);
       if (endPtr != updateIdText.c_str() && *endPtr == '\0') {
-        const uint32_t updateId = static_cast<uint32_t>(parsed);
-        if (updateId >= telegramUpdateOffset_) {
-          telegramUpdateOffset_ = updateId + 1;
+        if (parsed <= 0xFFFFFFFFUL) {
+          const uint32_t updateId = static_cast<uint32_t>(parsed);
+          if (updateId >= telegramUpdateOffset_) {
+            telegramUpdateOffset_ = updateId + 1;
+          }
         }
       }
     }
@@ -340,12 +342,17 @@ void Notifier::handleTelegramCommand(const String &command, const String &chatId
     return;
   }
 
-  if (!command.startsWith("/capture") || cameraService_ == nullptr) {
+  if (!command.startsWith("/capture")) {
+    return;
+  }
+
+  CameraService *cameraService = cameraService_;
+  if (cameraService == nullptr) {
     return;
   }
 
   char path[48] = {};
-  const bool captured = cameraService_->captureToSd(path, sizeof(path));
+  const bool captured = cameraService->captureToSd(path, sizeof(path));
   if (!captured) {
     Serial.println(F("capture-bot: command capture failed"));
     return;
@@ -354,7 +361,7 @@ void Notifier::handleTelegramCommand(const String &command, const String &chatId
   const bool sent = notifyCaptureToChat(path, chatId.c_str());
   SD_MMC.remove(path);
   Serial.println(sent ? F("capture-bot: command capture sent")
-                      : F("capture-bot: command capture send failed"));
+                      : F("capture-bot: command capture send failed (capture removed)"));
 #else
   (void)command;
   (void)chatId;

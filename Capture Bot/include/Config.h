@@ -23,7 +23,7 @@ namespace NetworkSettings {
 constexpr unsigned long WifiConnectTimeoutMs = 10000;
 constexpr unsigned long TimeSyncTimeoutMs = 15000;
 constexpr unsigned long TelegramResponseTimeoutMs = 15000;
-constexpr unsigned long TelegramCommandPollMs = 2000;
+constexpr unsigned long TelegramCommandPollMs = 5000;
 constexpr unsigned long TelegramRetryIntervalMs = 60000;
 constexpr uint8_t TelegramMaxRetries = 5;
 constexpr uint8_t TelegramRetryQueueSize = 8;
