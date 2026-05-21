@@ -8,6 +8,7 @@
 #define WIFI_PASSWORD "your-password"
 #define TELEGRAM_BOT_TOKEN "123456:replace-me"
 #define TELEGRAM_CHAT_ID "123456789"
+#define TELEGRAM_ALLOWED_USER_ID "123456789"
 #define TELEGRAM_PHOTO_CAPTION "Security alert: photo captured"
 
 // Keep validation enabled for real deployments. Paste the PEM for the root CA

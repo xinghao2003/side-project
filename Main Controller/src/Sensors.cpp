@@ -6,16 +6,12 @@ void SecuritySensors::begin() {
   pinMode(Pins::Pir, INPUT);
   pinMode(Pins::UltrasonicTrig, OUTPUT);
   pinMode(Pins::UltrasonicEcho, INPUT);
-  pinMode(Pins::GasAnalog, INPUT);
 }
 
 SensorSnapshot SecuritySensors::read() {
   SensorSnapshot snapshot;
   snapshot.pirMotion = digitalRead(Pins::Pir) == HIGH;
   snapshot.distanceCm = readDistanceCm();
-  snapshot.gasRaw = analogRead(Pins::GasAnalog);
-  snapshot.gasDanger = snapshot.gasRaw >= Thresholds::GasDangerRaw;
-
   const bool distanceLooksHuman =
       snapshot.distanceCm >= Thresholds::MinHumanDistanceCm &&
       snapshot.distanceCm <= Thresholds::MaxHumanDistanceCm;

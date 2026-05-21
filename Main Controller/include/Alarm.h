@@ -4,7 +4,7 @@
 
 enum class AlarmReason : uint8_t {
   Intrusion,
-  GasLeak,
+  BreakIn,
 };
 
 class AlarmOutput {

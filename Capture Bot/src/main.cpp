@@ -17,7 +17,7 @@ void setup() {
   digitalWrite(Pins::FlashLed, LOW);
 
   const bool cameraReady = cameraService.begin();
-  notifier.begin();
+  notifier.begin(&cameraService);
 
   Serial.println(cameraReady ? F("capture-bot: ready")
                              : F("capture-bot: camera/sd init failed"));

@@ -12,8 +12,8 @@ constexpr uint8_t AuthOk = 7;
 constexpr uint8_t AuthWindow = 8;
 constexpr uint8_t Sim800Tx = 9;
 constexpr uint8_t Sim800Rx = 10;
-
-constexpr uint8_t GasAnalog = A0;
+constexpr uint8_t AuthFailAlarm = A0;
+constexpr uint8_t TelegramDisarm = A1;
 } // namespace Pins
 
 namespace Timing {
@@ -24,6 +24,7 @@ constexpr unsigned long DisarmWindowMs = 10000;
 constexpr unsigned long AlarmCooldownMs = 30000;
 constexpr unsigned long CameraPulseMs = 250;
 constexpr unsigned long AuthPulseDebounceMs = 1000;
+constexpr unsigned long AuthFailPulseDebounceMs = 1000;
 constexpr unsigned long AuthActionCooldownMs = 5000;
 constexpr unsigned long GsmCommandTimeoutMs = 3000;
 constexpr unsigned long GsmSmsPromptTimeoutMs = 5000;
@@ -33,7 +34,6 @@ constexpr unsigned long GsmCallDurationMs = 15000;
 } // namespace Timing
 
 namespace Thresholds {
-constexpr uint16_t GasDangerRaw = 620;
 constexpr uint16_t MinHumanDistanceCm = 35;
 constexpr uint16_t MaxHumanDistanceCm = 220;
 constexpr uint8_t IntrusionConfirmSamples = 3;
