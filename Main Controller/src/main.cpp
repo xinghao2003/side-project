@@ -27,6 +27,7 @@ unsigned long lastAuthPulseMs = 0;
 unsigned long lastAuthFailPulseMs = 0;
 unsigned long lastAuthActionMs = 0;
 unsigned long lastDiagnosticsMs = 0;
+AlarmReason pendingReason = AlarmReason::Intrusion;
 SensorSnapshot latestSnapshot;
 
 void enterState(SystemState next);
@@ -48,6 +49,17 @@ const __FlashStringHelper *stateName(SystemState current) {
     return F("ALARM");
   case SystemState::Disarmed:
     return F("DISARMED");
+  }
+
+  return F("UNKNOWN");
+}
+
+const __FlashStringHelper *alarmReasonName(AlarmReason reason) {
+  switch (reason) {
+  case AlarmReason::Intrusion:
+    return F("INTRUSION");
+  case AlarmReason::BreakIn:
+    return F("BREAK_IN");
   }
 
   return F("UNKNOWN");
@@ -116,6 +128,7 @@ void triggerEmergency(AlarmReason reason) {
     return;
   }
 
+  pendingReason = reason;
   lastAlarmMs = now;
   enterState(SystemState::Alarm);
   alarmOutput.start(reason);
@@ -182,6 +195,10 @@ void loop() {
     Serial.print(latestSnapshot.distanceCm);
     Serial.print(F(" human_likely="));
     Serial.print(latestSnapshot.humanLikely ? 1 : 0);
+    if (state == SystemState::Alarm) {
+      Serial.print(F(" reason="));
+      Serial.print(alarmReasonName(pendingReason));
+    }
     Serial.println();
   }
 

@@ -421,10 +421,13 @@ String Notifier::extractJsonString(const String &source, int start,
   }
 
   int valueEnd = valueStart;
-  while (valueEnd < static_cast<int>(source.length()) &&
-         (source[valueEnd] == '-' ||
-          (source[valueEnd] >= '0' && source[valueEnd] <= '9'))) {
-    ++valueEnd;
+  while (valueEnd < static_cast<int>(source.length())) {
+    const char c = source[valueEnd];
+    if ((c >= '0' && c <= '9') || (c == '-' && valueEnd == valueStart)) {
+      ++valueEnd;
+      continue;
+    }
+    break;
   }
 
   if (valueEnd <= valueStart) {
